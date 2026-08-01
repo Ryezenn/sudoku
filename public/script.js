@@ -3,6 +3,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const videoContainer = document.getElementById('video-container');
     const placeholder = document.getElementById('video-placeholder');
     const btnStartShare = document.getElementById('btn-start-share');
+    const btnStartCamera = document.getElementById('btn-start-camera');
     const btnScan = document.getElementById('btn-scan');
     const statusContainer = document.getElementById('status-container');
     const alignmentBox = document.getElementById('alignment-box');
@@ -26,38 +27,97 @@ document.addEventListener('DOMContentLoaded', () => {
         statusContainer.classList.remove('hidden');
     }
 
-    // 2. Screen Share Setup
+    function onVideoStarted(stream) {
+        video.srcObject = stream;
+        video.onloadedmetadata = () => {
+            placeholder.classList.add('hidden');
+            alignmentBox.classList.remove('hidden');
+            btnScan.classList.remove('hidden');
+            btnStartShare.classList.add('hidden');
+            btnStartCamera.classList.add('hidden');
+            
+            // Center alignment box initially
+            const vcRect = videoContainer.getBoundingClientRect();
+            let boxSize = Math.min(300, vcRect.width - 40, vcRect.height - 40);
+            alignmentBox.style.width = `${boxSize}px`;
+            alignmentBox.style.height = `${boxSize}px`;
+            alignmentBox.style.left = `${(vcRect.width - boxSize) / 2}px`;
+            alignmentBox.style.top = `${(vcRect.height - boxSize) / 2}px`;
+        };
+
+        stream.getVideoTracks()[0].onended = () => {
+            placeholder.classList.remove('hidden');
+            alignmentBox.classList.add('hidden');
+            btnScan.classList.add('hidden');
+            btnStartShare.classList.remove('hidden');
+            btnStartCamera.classList.remove('hidden');
+            video.srcObject = null;
+        };
+    }
+
+    // 2. Input Setup (Screen Share & Screenshot Upload)
+    const imageUpload = document.getElementById('image-upload');
+    const screenImg = document.getElementById('screen-img');
+    let isUsingImage = false;
+
+    function showAlignmentBox(width, height) {
+        placeholder.classList.add('hidden');
+        alignmentBox.classList.remove('hidden');
+        btnScan.classList.remove('hidden');
+        btnStartShare.classList.add('hidden');
+        imageUpload.parentElement.classList.add('hidden');
+        
+        // Center alignment box initially
+        const vcRect = videoContainer.getBoundingClientRect();
+        let boxSize = Math.min(300, vcRect.width - 40, vcRect.height - 40);
+        alignmentBox.style.width = `${boxSize}px`;
+        alignmentBox.style.height = `${boxSize}px`;
+        alignmentBox.style.left = `${(vcRect.width - boxSize) / 2}px`;
+        alignmentBox.style.top = `${(vcRect.height - boxSize) / 2}px`;
+    }
+
     btnStartShare.addEventListener('click', async () => {
         try {
             const stream = await navigator.mediaDevices.getDisplayMedia({
                 video: { cursor: "never" }
             });
+            isUsingImage = false;
+            video.style.display = 'block';
+            screenImg.style.display = 'none';
             video.srcObject = stream;
             
             video.onloadedmetadata = () => {
-                placeholder.classList.add('hidden');
-                alignmentBox.classList.remove('hidden');
-                btnScan.classList.remove('hidden');
-                btnStartShare.classList.add('hidden');
-                
-                // Center alignment box initially
-                const vcRect = videoContainer.getBoundingClientRect();
-                alignmentBox.style.left = `${(vcRect.width - 300) / 2}px`;
-                alignmentBox.style.top = `${(vcRect.height - 300) / 2}px`;
+                showAlignmentBox(video.videoWidth, video.videoHeight);
             };
 
             stream.getVideoTracks()[0].onended = () => {
-                // When sharing stops
                 placeholder.classList.remove('hidden');
                 alignmentBox.classList.add('hidden');
                 btnScan.classList.add('hidden');
                 btnStartShare.classList.remove('hidden');
+                imageUpload.parentElement.classList.remove('hidden');
                 video.srcObject = null;
             };
-
         } catch (err) {
             console.error("Error: " + err);
             showStatus("Gagal membagikan layar.", "error");
+        }
+    });
+
+    imageUpload.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                isUsingImage = true;
+                video.style.display = 'none';
+                screenImg.style.display = 'block';
+                screenImg.src = event.target.result;
+                screenImg.onload = () => {
+                    showAlignmentBox(screenImg.naturalWidth, screenImg.naturalHeight);
+                };
+            };
+            reader.readAsDataURL(file);
         }
     });
 
@@ -119,7 +179,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 4. OCR and Solve Logic
     btnScan.addEventListener('click', async () => {
-        if (!video.videoWidth) return;
+        const sourceElement = isUsingImage ? screenImg : video;
+        const sourceWidth = isUsingImage ? sourceElement.naturalWidth : sourceElement.videoWidth;
+        const sourceHeight = isUsingImage ? sourceElement.naturalHeight : sourceElement.videoHeight;
+        
+        if (!sourceWidth) return;
 
         showStatus("Mendeteksi angka... Mohon tunggu (membutuhkan waktu beberapa detik).", "info");
         btnScan.disabled = true;
@@ -127,40 +191,40 @@ document.addEventListener('DOMContentLoaded', () => {
         // Clear previous results
         for(let i = 0; i < 81; i++) document.getElementById(`cell-${i}`).textContent = '';
 
-        // Calculate proportions of the alignment box relative to the actual video dimensions
-        const videoRect = video.getBoundingClientRect();
+        // Calculate proportions of the alignment box relative to the actual dimensions
+        const containerRect = sourceElement.getBoundingClientRect();
         const boxRect = alignmentBox.getBoundingClientRect();
         
-        // Handle letterboxing/pillarboxing inside the video element
-        const videoRatio = video.videoWidth / video.videoHeight;
-        const containerRatio = videoRect.width / videoRect.height;
+        // Handle letterboxing/pillarboxing inside the container
+        const sourceRatio = sourceWidth / sourceHeight;
+        const containerRatio = containerRect.width / containerRect.height;
         
-        let renderedWidth = videoRect.width;
-        let renderedHeight = videoRect.height;
+        let renderedWidth = containerRect.width;
+        let renderedHeight = containerRect.height;
         let offsetX = 0;
         let offsetY = 0;
 
-        if (videoRatio > containerRatio) {
-            renderedHeight = videoRect.width / videoRatio;
-            offsetY = (videoRect.height - renderedHeight) / 2;
+        if (sourceRatio > containerRatio) {
+            renderedHeight = containerRect.width / sourceRatio;
+            offsetY = (containerRect.height - renderedHeight) / 2;
         } else {
-            renderedWidth = videoRect.height * videoRatio;
-            offsetX = (videoRect.width - renderedWidth) / 2;
+            renderedWidth = containerRect.height * sourceRatio;
+            offsetX = (containerRect.width - renderedWidth) / 2;
         }
 
-        const scaleX = video.videoWidth / renderedWidth;
-        const scaleY = video.videoHeight / renderedHeight;
+        const scaleX = sourceWidth / renderedWidth;
+        const scaleY = sourceHeight / renderedHeight;
 
         // Map CSS coordinates to actual video pixels
-        const cropX = (boxRect.left - videoRect.left - offsetX) * scaleX;
-        const cropY = (boxRect.top - videoRect.top - offsetY) * scaleY;
+        const cropX = (boxRect.left - containerRect.left - offsetX) * scaleX;
+        const cropY = (boxRect.top - containerRect.top - offsetY) * scaleY;
         const cropW = boxRect.width * scaleX;
         const cropH = boxRect.height * scaleY;
 
         // Draw cropped area to canvas
         canvas.width = cropW;
         canvas.height = cropH;
-        ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+        ctx.drawImage(sourceElement, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
 
         // Preprocess: Grayscale and contrast for better OCR
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);

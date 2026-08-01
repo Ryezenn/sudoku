@@ -68,9 +68,9 @@ header p { color: var(--text-secondary); font-size: 1.1rem; }
 /* Video Section */
 .video-container {
     position: relative;
-    width: 600px;
-    height: 600px; /* Force a square for easier grid handling or allow dynamic based on video */
-    max-width: 100%;
+    width: 100%;
+    aspect-ratio: 1; /* Keep it square-ish or let it adapt */
+    max-width: 600px;
     background: #000;
     border-radius: 12px;
     overflow: hidden;

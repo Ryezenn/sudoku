@@ -21,9 +21,10 @@
             
             <div class="video-container" id="video-container">
                 <div class="placeholder" id="video-placeholder">
-                    🎥 Video layar akan muncul di sini. Klik "Mulai Bagikan Layar".
+                    Pilih "Upload Screenshot" atau "Bagikan Layar".
                 </div>
                 <video id="screen-video" autoplay playsinline muted></video>
+                <img id="screen-img" style="display: none; width: 100%; height: 100%; object-fit: contain;">
                 
                 <!-- The draggable and resizable alignment box -->
                 <div id="alignment-box" class="hidden">
@@ -39,17 +40,21 @@
 
             <div class="sidebar">
                 <div class="glass-panel instructions-panel">
-                    <h3>Cara Menggunakan:</h3>
+                    <h3>Cara Menggunakan (Di HP):</h3>
                     <ol>
-                        <li>Pastikan layar HP Anda (game Sudoku) sudah tampil di laptop (via Scrcpy / Phone Link).</li>
-                        <li>Klik <strong>Mulai Bagikan Layar</strong> dan pilih jendela mirroring tersebut.</li>
-                        <li>Geser dan ubah ukuran <strong>Kotak Biru</strong> agar sejajar sempurna menutupi seluruh kotak Sudoku.</li>
-                        <li>Klik <strong>Scan & Solve</strong>.</li>
+                        <li>Buka game Sudoku di HP Anda, lalu <strong>Ambil Screenshot (Tangkapan Layar)</strong>.</li>
+                        <li>Klik <strong>Upload Screenshot</strong> di bawah dan pilih gambar tersebut.</li>
+                        <li>Atau, gunakan <strong>Bagikan Layar</strong> (Split-screen) jika HP Anda mendukungnya.</li>
+                        <li>Geser <strong>Kotak Biru</strong> agar pas dengan papan Sudoku, lalu klik <strong>Scan & Solve</strong>.</li>
                     </ol>
                 </div>
                 
                 <div class="controls-vertical">
-                    <button class="btn btn-primary" id="btn-start-share">Mulai Bagikan Layar</button>
+                    <label class="btn btn-primary" style="text-align: center; display: block; cursor: pointer;">
+                        Upload Screenshot
+                        <input type="file" id="image-upload" accept="image/*" style="display: none;">
+                    </label>
+                    <button class="btn btn-secondary" id="btn-start-share">Mulai Bagikan Layar</button>
                     <button class="btn btn-accent hidden" id="btn-scan">Scan & Solve</button>
                 </div>
 
