@@ -1,0 +1,12 @@
+{
+  "name": "sudoku-screen-share",
+  "version": "1.0.0",
+  "description": "Sudoku with screen recording",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}
