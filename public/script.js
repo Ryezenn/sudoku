@@ -21,7 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
         gridOverlay.appendChild(cell);
     }
 
-    function showStatus(msg, type='info') {
+    function showStatus(msg, type = 'info') {
         statusContainer.textContent = msg;
         statusContainer.className = `message ${type}`;
         statusContainer.classList.remove('hidden');
@@ -35,7 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
             btnScan.classList.remove('hidden');
             btnStartShare.classList.add('hidden');
             btnStartCamera.classList.add('hidden');
-            
+
             // Center alignment box initially
             const vcRect = videoContainer.getBoundingClientRect();
             let boxSize = Math.min(300, vcRect.width - 40, vcRect.height - 40);
@@ -64,6 +64,7 @@ document.addEventListener('DOMContentLoaded', () => {
         placeholder.classList.add('hidden');
         alignmentBox.classList.remove('hidden');
         btnScan.classList.remove('hidden');
+        btnAutoAlign.classList.remove('hidden');
         btnStartShare.classList.add('hidden');
         imageUpload.parentElement.classList.add('hidden');
         
@@ -74,6 +75,19 @@ document.addEventListener('DOMContentLoaded', () => {
         alignmentBox.style.height = `${boxSize}px`;
         alignmentBox.style.left = `${(vcRect.width - boxSize) / 2}px`;
         alignmentBox.style.top = `${(vcRect.height - boxSize) / 2}px`;
+
+        // Automatically trigger auto-alignment
+        runAutoAlignWithRetry();
+    }
+
+    // Poll for OpenCV loading and execute grid detection
+    function runAutoAlignWithRetry() {
+        if (typeof cv !== 'undefined' && cv.Mat && cv.imread) {
+            detectSudokuGrid();
+        } else {
+            showStatus("Menyiapkan detektor otomatis (OpenCV)... Mohon tunggu.", "info");
+            setTimeout(runAutoAlignWithRetry, 500);
+        }
     }
 
     btnStartShare.addEventListener('click', async () => {
@@ -94,6 +108,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 placeholder.classList.remove('hidden');
                 alignmentBox.classList.add('hidden');
                 btnScan.classList.add('hidden');
+                btnAutoAlign.classList.add('hidden');
                 btnStartShare.classList.remove('hidden');
                 imageUpload.parentElement.classList.remove('hidden');
                 video.srcObject = null;
@@ -119,6 +134,10 @@ document.addEventListener('DOMContentLoaded', () => {
             };
             reader.readAsDataURL(file);
         }
+    });
+
+    btnAutoAlign.addEventListener('click', () => {
+        runAutoAlignWithRetry();
     });
 
     // 3. Draggable and Resizable Alignment Box
@@ -182,23 +201,23 @@ document.addEventListener('DOMContentLoaded', () => {
         const sourceElement = isUsingImage ? screenImg : video;
         const sourceWidth = isUsingImage ? sourceElement.naturalWidth : sourceElement.videoWidth;
         const sourceHeight = isUsingImage ? sourceElement.naturalHeight : sourceElement.videoHeight;
-        
+
         if (!sourceWidth) return;
 
         showStatus("Mendeteksi angka... Mohon tunggu (membutuhkan waktu beberapa detik).", "info");
         btnScan.disabled = true;
-        
+
         // Clear previous results
-        for(let i = 0; i < 81; i++) document.getElementById(`cell-${i}`).textContent = '';
+        for (let i = 0; i < 81; i++) document.getElementById(`cell-${i}`).textContent = '';
 
         // Calculate proportions of the alignment box relative to the actual dimensions
         const containerRect = sourceElement.getBoundingClientRect();
         const boxRect = alignmentBox.getBoundingClientRect();
-        
+
         // Handle letterboxing/pillarboxing inside the container
         const sourceRatio = sourceWidth / sourceHeight;
         const containerRatio = containerRect.width / containerRect.height;
-        
+
         let renderedWidth = containerRect.width;
         let renderedHeight = containerRect.height;
         let offsetX = 0;
@@ -230,19 +249,19 @@ document.addEventListener('DOMContentLoaded', () => {
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const data = imageData.data;
         for (let i = 0; i < data.length; i += 4) {
-            let avg = (data[i] + data[i+1] + data[i+2]) / 3;
+            let avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
             // High contrast threshold
-            let val = avg < 128 ? 0 : 255; 
-            data[i] = data[i+1] = data[i+2] = val;
+            let val = avg < 128 ? 0 : 255;
+            data[i] = data[i + 1] = data[i + 2] = val;
         }
         ctx.putImageData(imageData, 0, 0);
 
         // Read all 81 cells
         const cellW = cropW / 9;
         const cellH = cropH / 9;
-        
-        const board = Array.from({length: 9}, () => Array(9).fill(0));
-        
+
+        const board = Array.from({ length: 9 }, () => Array(9).fill(0));
+
         // Initialize Tesseract Worker
         const worker = await Tesseract.createWorker('eng');
         await worker.setParameters({
@@ -251,10 +270,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Optimization: instead of 81 separate OCR calls, we could run it on the whole grid
         // But cell by cell gives better positional certainty.
-        
+
         // We shrink the cell boundaries slightly to avoid reading the grid lines
         const margin = 0.15; // 15% margin
-        
+
         for (let row = 0; row < 9; row++) {
             for (let col = 0; col < 9; col++) {
                 const cx = col * cellW + (cellW * margin);
@@ -263,14 +282,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 const ch = cellH * (1 - margin * 2);
 
                 const rect = { left: cx, top: cy, width: cw, height: ch };
-                
+
                 // For efficiency, we should check if the cell is completely empty (all white)
                 const cellData = ctx.getImageData(cx, cy, cw, ch).data;
                 let blackPixels = 0;
-                for(let i=0; i<cellData.length; i+=4) {
+                for (let i = 0; i < cellData.length; i += 4) {
                     if (cellData[i] < 100) blackPixels++;
                 }
-                
+
                 // If there are very few black pixels, it's an empty cell
                 if (blackPixels < (cw * ch * 0.02)) {
                     board[row][col] = 0;
@@ -289,7 +308,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         }
-        
+
         await worker.terminate();
 
         // Feed to solver
@@ -300,7 +319,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Render solution
             for (let row = 0; row < 9; row++) {
                 for (let col = 0; col < 9; col++) {
-                    const el = document.getElementById(`cell-${row*9 + col}`);
+                    const el = document.getElementById(`cell-${row * 9 + col}`);
                     if (board[row][col] === 0) {
                         // It was empty, show the solved number
                         el.textContent = boardCopy[row][col];
@@ -316,8 +335,104 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             showStatus("Gagal memecahkan Sudoku. Pastikan grid pas dengan angkanya.", "error");
         }
-        
+
         btnScan.disabled = false;
     });
+
+    // 5. OpenCV-based Auto Alignment
+    function detectSudokuGrid() {
+        if (typeof cv === 'undefined') {
+            showStatus("OpenCV.js belum siap.", "error");
+            return;
+        }
+
+        const sourceElement = isUsingImage ? screenImg : video;
+        const sourceWidth = isUsingImage ? sourceElement.naturalWidth : sourceElement.videoWidth;
+        const sourceHeight = isUsingImage ? sourceElement.naturalHeight : sourceElement.videoHeight;
+        
+        if (!sourceWidth) return;
+
+        showStatus("Mendeteksi grid otomatis...", "info");
+
+        // Draw full image to canvas for OpenCV processing
+        canvas.width = sourceWidth;
+        canvas.height = sourceHeight;
+        ctx.drawImage(sourceElement, 0, 0, sourceWidth, sourceHeight);
+
+        let src = cv.imread(canvas);
+        let gray = new cv.Mat();
+        cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
+        
+        let blurred = new cv.Mat();
+        cv.GaussianBlur(gray, blurred, new cv.Size(5, 5), 0, 0, cv.BORDER_DEFAULT);
+        
+        let thresh = new cv.Mat();
+        cv.adaptiveThreshold(blurred, thresh, 255, cv.ADAPTIVE_THRESH_MEAN_C, cv.THRESH_BINARY_INV, 11, 2);
+        
+        let contours = new cv.MatVector();
+        let hierarchy = new cv.Mat();
+        cv.findContours(thresh, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+        
+        let bestRect = null;
+        let maxArea = 0;
+        const totalArea = sourceWidth * sourceHeight;
+
+        for (let i = 0; i < contours.size(); ++i) {
+            let cnt = contours.get(i);
+            let area = cv.contourArea(cnt);
+            
+            // Limit search to contours that are 5% to 90% of total image area
+            if (area > totalArea * 0.05 && area < totalArea * 0.90) {
+                let rect = cv.boundingRect(cnt);
+                let aspectRatio = rect.width / rect.height;
+                
+                // A Sudoku grid is square (aspect ratio ~1.0)
+                if (aspectRatio > 0.8 && aspectRatio < 1.25) {
+                    if (area > maxArea) {
+                        maxArea = area;
+                        bestRect = rect;
+                    }
+                }
+            }
+        }
+        
+        // Clean up
+        src.delete(); gray.delete(); blurred.delete(); thresh.delete();
+        contours.delete(); hierarchy.delete();
+
+        if (bestRect) {
+            // Map image coordinates back to screen dimensions
+            const containerRect = sourceElement.getBoundingClientRect();
+            
+            const sourceRatio = sourceWidth / sourceHeight;
+            const containerRatio = containerRect.width / containerRect.height;
+            
+            let renderedWidth = containerRect.width;
+            let renderedHeight = containerRect.height;
+            let offsetX = 0;
+            let offsetY = 0;
+
+            if (sourceRatio > containerRatio) {
+                renderedHeight = containerRect.width / sourceRatio;
+                offsetY = (containerRect.height - renderedHeight) / 2;
+            } else {
+                renderedWidth = containerRect.height * sourceRatio;
+                offsetX = (containerRect.width - renderedWidth) / 2;
+            }
+
+            const scaleX = renderedWidth / sourceWidth;
+            const scaleY = renderedHeight / sourceHeight;
+
+            // Position and size the alignment box
+            alignmentBox.style.left = `${(bestRect.x * scaleX) + offsetX}px`;
+            alignmentBox.style.top = `${(bestRect.y * scaleY) + offsetY}px`;
+            alignmentBox.style.width = `${bestRect.width * scaleX}px`;
+            alignmentBox.style.height = `${bestRect.height * scaleY}px`;
+            
+            showStatus("Papan Sudoku berhasil dideteksi secara otomatis!", "success");
+        } else {
+            showStatus("Gagal mendeteksi otomatis. Geser kotak biru secara manual.", "info");
+        }
+    }
 
 });

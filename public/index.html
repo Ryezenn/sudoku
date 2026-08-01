@@ -9,6 +9,8 @@
     
     <!-- Load Tesseract.js for OCR -->
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <!-- Load OpenCV.js for Grid Detection -->
+    <script src="https://docs.opencv.org/4.5.4/opencv.js" async></script>
 </head>
 <body>
     <div class="glass-container main-wrapper auto-solver-wrapper">
@@ -55,6 +57,7 @@
                         <input type="file" id="image-upload" accept="image/*" style="display: none;">
                     </label>
                     <button class="btn btn-secondary" id="btn-start-share">Mulai Bagikan Layar</button>
+                    <button class="btn btn-secondary hidden" id="btn-auto-align">Paskan Otomatis</button>
                     <button class="btn btn-accent hidden" id="btn-scan">Scan & Solve</button>
                 </div>
 
